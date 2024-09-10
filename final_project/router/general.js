@@ -71,7 +71,7 @@ public_users.get("/isbn/:isbn", function (req, res) {
   };
 
   // We make the request to the mockUrl to get the books object. Parsed into an objct from the JSON response we get on the promise
-  getBooksByIsbn(`${mockApiUrl}`)
+  getBooksByIsbn(mockApiUrl)
     .then((data) => {
       return res.status(200).send(data[isbn]);
     })
@@ -82,31 +82,65 @@ public_users.get("/isbn/:isbn", function (req, res) {
 });
 
 // Get book details based on author
-public_users.get("/author/:author", function (req, res) {
-  const { author } = req.params;
-  let counter = 1;
-  while (counter <= Object.keys(books).length) {
-    if (Object.values(books[counter]).includes(author)) {
-      return res.status(200).send(JSON.stringify(books[counter], null, 4));
+public_users.get("/author/:author", async function (req, res) {
+  try {
+    const { author } = req.params;
+    let counter = 1;
+    const response = await axios.get(mockApiUrl);
+    if (response) {
+      while (counter <= Object.keys(response).length) {
+        if (Object.values(response.data[counter]).includes(author)) {
+          return res.status(200).json(response.data[counter]);
+        }
+        counter++;
+      }
     }
-    counter++;
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(404)
+      .json({ message: `Book written by ${author} not found.` });
   }
-  return res
-    .status(404)
-    .json({ message: `Book written by ${author} not found.` });
 });
 
 // Get all books based on title
 public_users.get("/title/:title", function (req, res) {
   const { title } = req.params;
-  let counter = 1;
-  while (counter <= Object.keys(books).length) {
-    if (Object.values(books[counter]).includes(title)) {
-      return res.status(200).send(JSON.stringify(books[counter], null, 4));
-    }
-    counter++;
-  }
-  return res.status(404).json({ message: `Book called ${title} not found.` });
+
+  const getBooks = (url) => {
+    return new Promise((resolve, reject) => {
+      http
+        .get(url, (response) => {
+          let data = "";
+
+          response.on("data", (chunk) => {
+            data += chunk;
+          });
+
+          response.on("end", () => {
+            resolve(JSON.parse(data));
+          });
+        })
+        .on("error", (error) => reject(error));
+    });
+  };
+
+  getBooks(mockApiUrl)
+    .then((data) => {
+      let counter = 1;
+      while (counter <= Object.keys(data).length) {
+        if (Object.values(data[counter]).includes(title)) {
+          return res.status(200).send(JSON.stringify(data[counter], null, 4));
+        }
+        counter++;
+      }
+    })
+    .catch((error) => {
+      console.log(error);
+      return res
+        .status(404)
+        .json({ message: `Book called ${title} not found.` });
+    });
 });
 
 //  Get book review
